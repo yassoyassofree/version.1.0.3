@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management and Passcode Input</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+            text-align: center;
+        }
+        .container {
+            text-align: center;
+            border-radius: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            opacity: 0; 
+            transform: translateY(-30px); 
+            transition: opacity 1s ease, transform 0.5s ease;
+        }
+        /* Style declarations for input and buttons */
+        #passcode {
+            margin-bottom: 20px;
+            font-size: 24px;
+            padding: 10px;
+            width: 120px;
+            text-align: center;
+            border: none;
+            border-radius: 5px;
+            background-color: #fff;
+            color: #333;
+        }
+        .button-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .button-container button {
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            border: none;
+            border-radius: 10px;
+            background-color: #1e90ff;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        /* Button styles */
+        .button-container button:hover {
+            background-color: #00bfff;
+            transform: scale(1.1);
+        }
+        .button-container button:active {
+            transform: scale(0.95);
+        }
+        .erase-button {
+            background-color: #e74c3c;
+        }
+        .erase-button:hover {
+            background-color: #c0392b;
+        }
+        .show {
+            opacity: 1; 
+            transform: translateY(0);
+        }
+        .history-list {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        .clear-button, .toggle-button {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        /* Button hover styles */
+        .clear-button {
+            background-color: #f39c12;
+            color: #fff;
+        }
+        .clear-button:hover {
+            background-color: #e67e22;
+        }
+        .toggle-button {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .toggle-button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="keypad-container">
+        <input type="text" id="passcode" readonly>
+        <div class="button-container">
+            <button onclick="appendDigit(1)">1</button>
+            <button onclick="appendDigit(2)">2</button>
+            <button onclick="appendDigit(3)">3</button>
+            <button onclick="appendDigit(4)">4</button>
+            <button onclick="appendDigit(5)">5</button>
+            <button onclick="appendDigit(6)">6</button>
+            <button onclick="appendDigit(7)">7</button>
+            <button onclick="appendDigit(8)">8</button>
+            <button onclick="appendDigit(9)">9</button>
+            <button class="clear all appendDigit" onclick="clearallDigits()">clear</button>
+            <button onclick="appendDigit(0)">0</button>
+            <button class="erase-button" onclick="eraseDigit()">⌫</button>
+        </div>
+    </div>
+
+    <div id="adminSections" class="hidden">
+        <h2>Blocked Users</h2>
+        <ul id="blockedList" class="history-list"></ul>
+
+        <h2>User History</h2>
+        <ul id="userHistoryList" class="history-list"></ul>
+        
+        <h2>All User Actions</h2>
+        <ul id="actionHistory" class="history-list"></ul>
+
+        <h2>Recent Users</h2>
+        <ul id="recentUsers" class="history-list"></ul>
+
+        <button class="clear-button" onclick="clearAllHistories()">Clear All History</button>
+        <button class="toggle-button" onclick="toggleAdminSections()">Toggle Admin Info</button>
+    </div>
+    <script>
+        function clearallDigits() {
+            enteredDigits = '';
+            displayPasscode();
+        }
+    </script>
+    <script>
+        const correctPasscode = '402010';
+        const adminLoginPassword = "admin.log.login"; // Admin login password
+        let blockedUsers = JSON.parse(localStorage.getItem('blockedUsers')) || [];
+        let userHistories = JSON.parse(localStorage.getItem('userHistories')) || {};
+        let recentUsers = JSON.parse(localStorage.getItem('recentUsers')) || [];
+        let actionHistory = JSON.parse(localStorage.getItem('actionHistory')) || [];
+        let enteredDigits = '';
+
+        function appendDigit(digit) {
+            enteredDigits += digit;
+            displayPasscode();
+            checkPasscode();
+        }
+
+        function displayPasscode() {
+            const passcodeInput = document.getElementById('passcode');
+            const hiddenDisplay = '#'.repeat(enteredDigits.length);
+            passcodeInput.value = hiddenDisplay;
+        }
+
+        function eraseDigit() {
+            enteredDigits = enteredDigits.slice(0, -1);
+            displayPasscode();
+        }
+
+        function checkPasscode() {
+            if (enteredDigits === correctPasscode) {
+                setTimeout(() => {
+                    const userName = prompt("Passcode correct! Please enter your name:");
+                    if (userName && userName.trim()) {
+                        saveName(userName.trim());
+                        reloadBlockedList(); // Reload list for updates
+                    }
+                }, 500);
+            }
+        }
+
+        function saveName(name) {
+            const isBlocked = blockedUsers.some(blockedUser => name.startsWith(blockedUser));
+            
+            if (isBlocked) {
+                alert(`${name} is blocked and cannot join. Please choose a different username.`);
+                return; 
+            }
+
+            // Log user actions and history
+            const currentDate = new Date().toLocaleDateString();
+            if (!userHistories[name]) {
+                userHistories[name] = {};
+            }
+            if (!userHistories[name][currentDate]) {
+                userHistories[name][currentDate] = []; // Initialize user history
+            }
+
+            userHistories[name][currentDate].push(`${name} logged in`); // Log the action to user's own history
+            localStorage.setItem('userHistories', JSON.stringify(userHistories)); // Save updated histories
+
+            // Also log this user into recent users
+            updateRecentUsers(name);
+
+            logAction(name, 'opened the application'); // Log this action
+            window.location.href = 'welcome.html'; // Redirect to welcome page
+            populateUserHistory(name); // Populate user history section
+        }
+
+        function updateRecentUsers(name) {
+            if (!recentUsers.includes(name)) {
+                recentUsers.push(name);
+                localStorage.setItem('recentUsers', JSON.stringify(recentUsers));
+                populateRecentUsers(); // Update the UI
+            }
+        }
+
+        function populateUserHistory(name) {
+            const userHistoryList = document.getElementById('userHistoryList');
+            userHistoryList.innerHTML = ''; // Clear existing history
+            const currentDate = new Date().toLocaleDateString();
+
+            if (userHistories[name] && userHistories[name][currentDate]) {
+                userHistories[name][currentDate].forEach(action => {
+                    userHistoryList.innerHTML += `<li>${action}</li>`;
+                });
+            } else {
+                userHistoryList.innerHTML = `<li>No actions recorded for today.</li>`;
+            }
+        }
+
+        function showAdminOptions(username) {
+            const adminPassword = prompt("Enter admin password:");
+            if (adminPassword === adminLoginPassword) {
+                const action = prompt("Choose an action: \n1. block.username \n2. unblock.username \n3. view");
+                if (action) {
+                    const [command, user] = action.split('.');
+                    if (command === 'block') {
+                        blockUser(user);
+                    } else if (command === 'unblock') {
+                        unblockUser(user);
+                    } else if (command === 'view') {
+                        showAdminSections();
+                    } else {
+                        alert("Invalid command. Please try again.");
+                    }
+                }
+            } else {
+                alert("Incorrect password.");
+            }
+        }
+
+        function showAdminSections() {
+            document.getElementById('adminSections').classList.remove('hidden');
+            populateBlockedList();
+            displayActionHistory();
+            populateRecentUsers();
+            populateAllUserHistories();
+        }
+
+        function toggleAdminSections() {
+            const adminSections = document.getElementById('adminSections');
+            adminSections.classList.toggle('hidden');
+        }
+
+        function blockUser(username) {
+            if (!blockedUsers.includes(username)) {
+                blockedUsers.push(username);
+                saveBlockedUsers();
+                populateBlockedList();
+                logAction(username, 'blocked');
+                alert(`${username} has been blocked.`);
+            } else {
+                alert(`${username} is already blocked.`);
+            }
+        }
+
+        function unblockUser(username) {
+            const index = blockedUsers.indexOf(username);
+            if (index !== -1) {
+                blockedUsers.splice(index, 1);
+                saveBlockedUsers(); 
+                populateBlockedList(); 
+                logAction(username, 'unblocked');
+                alert(`${username} has been unblocked.`);
+            } else {
+                alert(`${username} is not blocked.`);
+            }
+        }
+
+        function saveBlockedUsers() {
+            localStorage.setItem('blockedUsers', JSON.stringify(blockedUsers));
+        }
+
+        function logAction(username, action) {
+            const logEntry = `${username} ${action} on ${new Date().toLocaleString()}`;
+            actionHistory.push(logEntry);
+            localStorage.setItem('actionHistory', JSON.stringify(actionHistory));
+        }
+
+        function displayActionHistory() {
+            const actionList = document.getElementById('actionHistory');
+            actionList.innerHTML = ''; 
+            actionHistory.forEach(log => {
+                actionList.innerHTML += `<li>${log}</li>`;
+            });
+        }
+
+        function clearAllHistories() {
+            blockedUsers = [];
+            recentUsers = [];
+            actionHistory = [];
+            userHistories = {};
+            localStorage.clear();
+            populateBlockedList();
+            displayActionHistory();
+            alert("All histories cleared.");
+        }
+
+        function populateBlockedList() {
+            const blockedList = document.getElementById('blockedList');
+            blockedList.innerHTML = ''; 
+            blockedUsers.forEach(user => {
+                blockedList.innerHTML += `<li>${user}</li>`;
+            });
+        }
+
+        function populateRecentUsers() {
+            const recentUsersList = document.getElementById('recentUsers');
+            recentUsersList.innerHTML = ''; 
+            recentUsers.forEach(user => {
+                recentUsersList.innerHTML += `<li>${user}</li>`;
+            });
+        }
+
+        function reloadBlockedList() {
+            blockedUsers = JSON.parse(localStorage.getItem('blockedUsers')) || [];
+            populateBlockedList();
+        }
+
+        function populateAllUserHistories() {
+            const allHistories = document.getElementById('actionHistory');
+            const uniqueUsers = Object.keys(userHistories);
+
+            if (uniqueUsers.length == 0) {
+                allHistories.innerHTML = '<li>No user activities recorded yet.</li>';
+                return;
+            }
+
+            // List out all user actions
+            uniqueUsers.forEach(user => {
+                const actions = userHistories[user];
+                for (const date in actions) {
+                    allHistories.innerHTML += `<li>${user} activities on ${date}: ${actions[date].join(', ')}</li>`;
+                }
+            });
+        }
+
+        window.onload = function() {
+            const keypadContainer = document.getElementById('keypad-container');
+            keypadContainer.classList.add('show');
+            reloadBlockedList(); // Populate the blocked list on page load
+        }
+
+        window.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === '\\') {
+                event.preventDefault(); 
+                const username = prompt("Enter your username:");
+                showAdminOptions(username); 
+            }
+        });
+    </script>
+</body>
+</html>
